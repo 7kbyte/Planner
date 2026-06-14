@@ -1,0 +1,33 @@
+<!--
+  应用图标占位文件 — 请替换为正式的 PNG 图标
+
+  图标规范：
+  - Windows: 256×256 PNG
+  - macOS:   512×512 PNG（electron-builder 会自动生成 .icns）
+  - Linux:   256×256 PNG
+
+  可使用以下在线工具生成图标：
+  https://www.icoconverter.com/
+  https://icon.kitchen/
+
+  或将此 SVG 导出为 PNG 后使用。
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#6366f1"/>
+      <stop offset="100%" style="stop-color:#4f46e5"/>
+    </linearGradient>
+  </defs>
+  <!-- 背景圆 -->
+  <rect width="512" height="512" rx="100" fill="url(#bg)"/>
+  <!-- 日历图标 -->
+  <rect x="128" y="160" width="256" height="224" rx="24" fill="white" opacity="0.95"/>
+  <rect x="128" y="160" width="256" height="56" rx="24" fill="#e0e7ff"/>
+  <!-- 对勾 -->
+  <circle cx="256" cy="310" r="52" fill="#22c55e"/>
+  <path d="M232 310L248 326L282 292" stroke="white" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <!-- 文字行 -->
+  <rect x="168" y="390" width="176" height="12" rx="6" fill="#c7d2fe"/>
+  <rect x="168" y="414" width="120" height="12" rx="6" fill="#e0e7ff"/>
+</svg>
