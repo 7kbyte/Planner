@@ -195,12 +195,22 @@ ipcMain.handle('templates:load', async () => {
 })
 
 ipcMain.handle('templates:add', async (_event, tmpl) => {
+  const now = currentTimeStr()
+  const today = todayStr()
+
+  // 检查今天是否在重复日列表中
+  const todayWeekday = new Date().getDay()
+  const shouldGenerateToday = tmpl.weekdays && tmpl.weekdays.includes(todayWeekday)
+
+  // 如果当前时间已过生成时间且今天是重复日，先标记 lastGeneratedDate 再写入，
+  // 避免 checkAndNotify 定时器在 addTemplate 与 updateTemplate 之间
+  // 读到未标记的模板而重复生成任务（竞态条件修复）
+  if (tmpl.generateTime <= now && tmpl.enabled && shouldGenerateToday) {
+    tmpl.lastGeneratedDate = today
+  }
   await addTemplate(tmpl)
 
-  // 如果当前时间已过生成时间，立即创建今日任务实例
-  const now = currentTimeStr()
-  if (tmpl.generateTime <= now && tmpl.enabled) {
-    const today = todayStr()
+  if (tmpl.generateTime <= now && tmpl.enabled && shouldGenerateToday) {
     const newTask: Task = {
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
       title: tmpl.title,
@@ -208,13 +218,12 @@ ipcMain.handle('templates:add', async (_event, tmpl) => {
       priority: tmpl.priority,
       dueTime: tmpl.dueTime,
       tag: tmpl.tag,
+      reminderTime: tmpl.reminderTime,
       completed: false,
       createdAt: new Date().toISOString(),
       templateId: tmpl.id,
     }
     await addTask(newTask)
-    tmpl.lastGeneratedDate = today
-    await updateTemplate(tmpl)
     console.log(`[template] 新建模板已立即生成任务: "${tmpl.title}"`)
     return newTask // 返回生成的任务给渲染进程
   }
@@ -274,11 +283,26 @@ async function checkAndNotify(): Promise<void> {
     const today = todayStr()
     const now = currentTimeStr()
 
+    console.log(`[notification] 开始检查 (${now}) — ${tasks.length} 个任务, ${templates.length} 个模板`)
+
     // ===== 1. 检查重复模板，生成今日任务实例 =====
+    let generatedCount = 0
     for (const tmpl of templates) {
       if (!tmpl.enabled) continue
       if (tmpl.lastGeneratedDate === today) continue // 今天已生成
       if (tmpl.generateTime > now) continue          // 还没到生成时间
+      if (!tmpl.weekdays || !tmpl.weekdays.includes(new Date().getDay())) continue // 今天不在重复日
+
+      // 防御性检查：是否已存在该模板今天生成的任务
+      // （防止与 templates:add handler 竞态导致重复生成）
+      const alreadyGenerated = tasks.some((t) => t.templateId === tmpl.id)
+      if (alreadyGenerated) {
+        // 同步 lastGeneratedDate，避免后续轮次再次检查
+        tmpl.lastGeneratedDate = today
+        await updateTemplate(tmpl)
+        console.log(`[template] 跳过重复生成: "${tmpl.title}" (任务已存在)`)
+        continue
+      }
 
       // 创建任务实例
       const newTask: Task = {
@@ -288,6 +312,7 @@ async function checkAndNotify(): Promise<void> {
         priority: tmpl.priority,
         dueTime: tmpl.dueTime,
         tag: tmpl.tag,
+        reminderTime: tmpl.reminderTime,
         completed: false,
         createdAt: new Date().toISOString(),
         templateId: tmpl.id,
@@ -298,25 +323,39 @@ async function checkAndNotify(): Promise<void> {
       tmpl.lastGeneratedDate = today
       await updateTemplate(tmpl)
 
-      console.log(`[template] 已生成任务: "${tmpl.title}" (${tmpl.generateTime})`)
+      generatedCount++
+      console.log(`[template] 已生成任务: "${tmpl.title}" (${tmpl.generateTime})${newTask.reminderTime ? ' ⏰提醒' + newTask.reminderTime : ''}`)
+    }
+
+    // 重新加载任务，以便 Section 2 能看到 Section 1 刚生成的任务
+    let notifyTasks = tasks
+    if (generatedCount > 0) {
+      notifyTasks = await loadTasks()
+      console.log(`[notification] 重新加载任务（新增 ${generatedCount} 个模板生成）`)
     }
 
     // ===== 2. 检查任务提醒通知 =====
-    for (const task of tasks) {
-      // 条件：未完成 + 有提醒时间 + 时间已过 + 今天未通知
-      if (task.completed) continue
-      if (!task.dueTime) continue
-      if (task.dueTime > now) continue
-      if (task.lastNotifiedDate === today) continue
+    const candidates = notifyTasks.filter((t) => !t.completed && !!t.reminderTime)
+    console.log(`[notification] 提醒候选: ${candidates.length} 个 (有reminderTime且未完成)`)
+
+    for (const task of candidates) {
+      if (task.reminderTime! > now) {
+        console.log(`[notification] 跳过 "${task.title}" — 提醒时间 ${task.reminderTime} > 当前 ${now}`)
+        continue
+      }
+      if (task.lastNotifiedDate === today) {
+        console.log(`[notification] 跳过 "${task.title}" — 今日已提醒`)
+        continue
+      }
 
       // 发送通知
-      sendNotification('📋 任务提醒', task.title)
+      sendNotification('⏰ 任务提醒', task.title)
 
-      // 标记已通知
+      // 标记已提醒
       task.lastNotifiedDate = today
       await updateTask(task)
 
-      console.log(`[notification] 已提醒: "${task.title}" (${task.dueTime})`)
+      console.log(`[notification] ✅ 已提醒: "${task.title}" (${task.reminderTime})`)
     }
   } catch (err) {
     console.error('[notification] 检查失败:', err)

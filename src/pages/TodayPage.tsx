@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { useTasks } from '../context/TaskContext'
 import type { RepeatTemplate, Task, TaskFormData } from '../types/task'
 import TaskCard from '../components/TaskCard'
+import TaskDetailPanel from '../components/TaskDetailPanel'
 import PendingTemplateCard from '../components/PendingTemplateCard'
 import AddTaskModal from '../components/AddTaskModal'
 import AddRepeatModal from '../components/AddRepeatModal'
@@ -44,6 +45,7 @@ export default function TodayPage() {
   const [deleteTargetTemplateId, setDeleteTargetTemplateId] = useState<string | null>(null)
   const [encouragement] = useState(pickEncouragement)
   const [, refresh] = useState(0) // 用于刷新模板列表
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null)
 
   // 加载模板
   useEffect(() => {
@@ -111,74 +113,78 @@ export default function TodayPage() {
             <span className="text-sm text-indigo-500 dark:text-indigo-400 font-medium">{encouragement}</span>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="px-4 py-2 rounded-xl text-sm font-medium text-white shadow-sm transition-colors"
-            style={{ backgroundColor: 'var(--color-primary-500)' }}
-          >
-            + 添加任务
-          </button>
-          <button
-            onClick={() => setIsRepeatModalOpen(true)}
-            className="px-4 py-2 rounded-xl text-sm font-medium border border-dashed border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-          >
-            🔄 重复模板
-          </button>
-        </div>
       </div>
 
       {!hasContent && <EmptyState />}
 
-      {/* 未完成任务 */}
+      {/* 未完成任务 — 网格 */}
       {incomplete.length > 0 && (
         <section className="mb-6">
-          <div className="flex items-center gap-2 mb-4">
+          <div className="flex items-center gap-2 mb-3">
             <span className="w-2 h-2 rounded-full bg-indigo-500" />
             <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
               未完成 &middot; {incomplete.length}
             </h3>
           </div>
-          {incomplete.map((task) => (
-            <TaskCard key={task.id} task={task} onToggle={toggleTask}
-              onEdit={(t) => { setEditingTask(t); setIsModalOpen(true) }}
-              onDelete={(t) => setDeleteTargetTask(t)} />
-          ))}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {incomplete.map((task) => (
+              <TaskCard key={task.id} task={task} selected={selectedTask?.id === task.id}
+                onToggle={toggleTask}
+                onClick={(t) => setSelectedTask(selectedTask?.id === t.id ? null : t)} />
+            ))}
+          </div>
         </section>
       )}
 
-      {/* 未生成的重复模板 */}
+      {/* 未生成的重复模板 — 网格 */}
       {pendingTemplates.length > 0 && (
         <section className="mb-6">
-          <div className="flex items-center gap-2 mb-4">
+          <div className="flex items-center gap-2 mb-3">
             <span className="w-2 h-2 rounded-full bg-amber-400" />
             <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
               暂未开始 &middot; {pendingTemplates.length}
             </h3>
           </div>
-          {pendingTemplates.map((tmpl) => (
-            <PendingTemplateCard key={tmpl.id} template={tmpl}
-              onEdit={(t) => { setEditingTemplate(t); setIsRepeatModalOpen(true) }}
-              onDelete={(id) => setDeleteTargetTemplateId(id)} />
-          ))}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {pendingTemplates.map((tmpl) => (
+              <PendingTemplateCard key={tmpl.id} template={tmpl}
+                onEdit={(t) => { setEditingTemplate(t); setIsRepeatModalOpen(true) }}
+                onDelete={(id) => setDeleteTargetTemplateId(id)} />
+            ))}
+          </div>
         </section>
       )}
 
-      {/* 已完成任务 */}
+      {/* 已完成任务 — 网格 */}
       {completed.length > 0 && (
         <section>
-          <div className="flex items-center gap-2 mb-4">
+          <div className="flex items-center gap-2 mb-3">
             <span className="w-2 h-2 rounded-full bg-green-500" />
             <h3 className="text-sm font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
               已完成 &middot; {completed.length}
             </h3>
           </div>
-          {completed.map((task) => (
-            <TaskCard key={task.id} task={task} onToggle={toggleTask}
-              onEdit={(t) => { setEditingTask(t); setIsModalOpen(true) }}
-              onDelete={(t) => setDeleteTargetTask(t)} />
-          ))}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {completed.map((task) => (
+              <TaskCard key={task.id} task={task} selected={selectedTask?.id === task.id}
+                onToggle={toggleTask}
+                onClick={(t) => setSelectedTask(selectedTask?.id === t.id ? null : t)} />
+            ))}
+          </div>
         </section>
+      )}
+
+      {/* 详情面板 */}
+      {selectedTask && (
+        <div className="mt-6">
+          <TaskDetailPanel
+            task={selectedTask}
+            onToggle={toggleTask}
+            onEdit={(t) => { setEditingTask(t); setIsModalOpen(true) }}
+            onDelete={(t) => setDeleteTargetTask(t)}
+            onClose={() => setSelectedTask(null)}
+          />
+        </div>
       )}
 
       <AddTaskModal

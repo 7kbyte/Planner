@@ -1,8 +1,8 @@
+import { useState, useEffect } from 'react'
 import { NavLink } from 'react-router-dom'
 import {
   CalendarDaysIcon,
   QueueListIcon,
-  CheckCircleIcon,
   ChartBarIcon,
   Cog6ToothIcon,
 } from '@heroicons/react/24/outline'
@@ -12,13 +12,29 @@ import {
 const navItems = [
   { to: '/', label: '今日', icon: CalendarDaysIcon },
   { to: '/all', label: '所有任务', icon: QueueListIcon },
-  { to: '/completed', label: '已完成', icon: CheckCircleIcon },
   { to: '/statistics', label: '统计分析', icon: ChartBarIcon },
 ] as const
+
+// ==================== 时钟 ====================
+
+function useClock() {
+  const [now, setNow] = useState(new Date())
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 1000)
+    return () => clearInterval(id)
+  }, [])
+  return {
+    time: now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }),
+    date: now.toLocaleDateString('zh-CN', { month: 'long', day: 'numeric' }),
+    weekday: ['日', '一', '二', '三', '四', '五', '六'][now.getDay()],
+  }
+}
 
 // ==================== 组件 ====================
 
 export default function Sidebar() {
+  const clock = useClock()
+
   return (
     <aside className="
       w-64 h-screen sticky top-0
@@ -38,6 +54,21 @@ export default function Sidebar() {
             <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5">
               日常计划管理
             </p>
+          </div>
+        </div>
+      </div>
+
+      {/* ---- 实时时钟 ---- */}
+      <div className="px-5 pb-4">
+        <div className="bg-white dark:bg-gray-800 rounded-xl px-4 py-3 ring-1 ring-gray-200/60 dark:ring-gray-700/60">
+          <div className="text-2xl font-mono font-bold text-gray-900 dark:text-white tracking-wider tabular-nums">
+            {clock.time}
+          </div>
+          <div className="flex items-center gap-1.5 mt-1">
+            <span className="text-xs text-gray-500 dark:text-gray-400">{clock.date}</span>
+            <span className="text-xs px-1.5 py-0.5 rounded-md bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400 font-medium">
+              周{clock.weekday}
+            </span>
           </div>
         </div>
       </div>

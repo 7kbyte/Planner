@@ -16,6 +16,7 @@ export default function AddTaskModal({ isOpen, onClose, onSave, task }: AddTaskM
   const [description, setDescription] = useState('')
   const [priority, setPriority] = useState<Task['priority']>('medium')
   const [dueTime, setDueTime] = useState('')
+  const [reminderTime, setReminderTime] = useState('')
   const [tag, setTag] = useState('')
 
   const resetForm = useCallback(() => {
@@ -24,12 +25,14 @@ export default function AddTaskModal({ isOpen, onClose, onSave, task }: AddTaskM
       setDescription(task.description || '')
       setPriority(task.priority)
       setDueTime(task.dueTime || '')
+      setReminderTime(task.reminderTime || '')
       setTag(task.tag || '')
     } else {
       setTitle('')
       setDescription('')
       setPriority('medium')
       setDueTime('')
+      setReminderTime('')
       setTag('')
     }
   }, [task])
@@ -63,6 +66,7 @@ export default function AddTaskModal({ isOpen, onClose, onSave, task }: AddTaskM
       description: description.trim() || undefined,
       priority,
       dueTime: dueTime || undefined,
+      reminderTime: reminderTime || undefined,
       tag: tag.trim() || undefined,
     })
     onClose()
@@ -83,7 +87,7 @@ export default function AddTaskModal({ isOpen, onClose, onSave, task }: AddTaskM
       {/* 模态框 */}
       <div
         className="
-          relative w-full max-w-md mx-4
+          relative w-full max-w-2xl mx-4
           bg-white dark:bg-gray-800
           rounded-2xl shadow-xl ring-1 ring-gray-200/60 dark:ring-gray-700/60
           p-6
@@ -137,48 +141,59 @@ export default function AddTaskModal({ isOpen, onClose, onSave, task }: AddTaskM
             />
           </div>
 
-          {/* 优先级 */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-              优先级
-            </label>
-            <div className="flex gap-2">
-              {(['low', 'medium', 'high'] as const).map((p) => (
-                <button
-                  key={p}
-                  type="button"
-                  onClick={() => setPriority(p)}
-                  className={`
-                    flex-1 py-2 rounded-xl text-sm font-medium
-                    transition-all duration-200
-                    ${
-                      priority === p
+          {/* 三列：优先级 + 最晚打卡 + 提醒时间 */}
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                优先级
+              </label>
+              <div className="flex gap-1.5">
+                {(['low', 'medium', 'high'] as const).map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => setPriority(p)}
+                    className={`
+                      flex-1 py-2 rounded-lg text-xs font-medium
+                      transition-all duration-200
+                      ${priority === p
                         ? p === 'high'
                           ? 'bg-red-500 text-white shadow-sm'
                           : p === 'medium'
                             ? 'bg-amber-500 text-white shadow-sm'
                             : 'bg-green-500 text-white shadow-sm'
                         : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
-                    }
-                  `}
-                >
-                  {p === 'high' ? '🔥 高' : p === 'medium' ? '⚡ 中' : '🌱 低'}
-                </button>
-              ))}
+                      }
+                    `}
+                  >
+                    {p === 'high' ? '🔥 高' : p === 'medium' ? '⚡ 中' : '🌱 低'}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
-
-          {/* 最晚打卡时间 */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-              最晚打卡时间
-            </label>
-            <input
-              type="time"
-              value={dueTime}
-              onChange={(e) => setDueTime(e.target.value)}
-              className="input"
-            />
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                最晚打卡
+              </label>
+              <input
+                type="time"
+                value={dueTime}
+                onChange={(e) => setDueTime(e.target.value)}
+                className="input"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                提醒时间
+              </label>
+              <input
+                type="time"
+                value={reminderTime}
+                onChange={(e) => setReminderTime(e.target.value)}
+                className="input"
+              />
+              <p className="text-[11px] text-gray-400 mt-1">不填不提醒</p>
+            </div>
           </div>
 
           {/* 标签 */}

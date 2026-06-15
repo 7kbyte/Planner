@@ -74,7 +74,7 @@ daily-planner/
 │   └── pages/
 │       ├── TodayPage.tsx    # 今日计划（默认页）
 │       ├── AllTasksPage.tsx  # 所有任务
-│       ├── CompletedPage.tsx # 已完成
+│       └── AllTasksPage.tsx   # 所有任务（支持筛选）
 │       ├── StatisticsPage.tsx# 统计分析（热力图 + 图表）
 │       └── SettingsPage.tsx  # 设置（主题色切换）
 ├── public/

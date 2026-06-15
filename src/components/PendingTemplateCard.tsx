@@ -1,5 +1,5 @@
 import type { RepeatTemplate } from '../types/task'
-import { PRIORITY_CONFIG, REPEAT_CONFIG } from '../types/task'
+import { PRIORITY_CONFIG, WEEKDAY_NAMES } from '../types/task'
 
 interface Props {
   template: RepeatTemplate
@@ -8,7 +8,11 @@ interface Props {
 }
 
 export default function PendingTemplateCard({ template, onEdit, onDelete }: Props) {
-  const { title, description, priority, dueTime, generateTime, tag, repeat } = template
+  const { title, description, priority, dueTime, generateTime, tag, weekdays } = template
+
+  const weekdaysLabel = weekdays.length === 0 ? '未设置'
+    : weekdays.length === 7 ? '每天'
+    : weekdays.map((d) => WEEKDAY_NAMES[d as keyof typeof WEEKDAY_NAMES]).join('、')
 
   return (
     <div className="
@@ -35,7 +39,7 @@ export default function PendingTemplateCard({ template, onEdit, onDelete }: Prop
               {PRIORITY_CONFIG[priority].label}
             </span>
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] bg-purple-50/60 text-purple-400 dark:bg-purple-900/20 dark:text-purple-500">
-              {REPEAT_CONFIG[repeat].icon} {REPEAT_CONFIG[repeat].label}
+              🔁 {weekdaysLabel}
             </span>
           </div>
 

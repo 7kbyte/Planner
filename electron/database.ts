@@ -44,6 +44,28 @@ export async function initDatabase(): Promise<void> {
   const filePath = path.join(app.getPath('userData'), 'tasks.json')
   console.log('[database]', '数据文件路径:', filePath)
   db = await createLowDB(filePath)
+
+  // ===== 数据迁移：旧 repeat 字段 → 新 weekdays 数组 =====
+  let migrated = 0
+  for (const tmpl of data().templates) {
+    if ((tmpl as any).repeat && !tmpl.weekdays) {
+      const oldRepeat: string = (tmpl as any).repeat
+      if (oldRepeat === 'daily') {
+        tmpl.weekdays = [0, 1, 2, 3, 4, 5, 6]
+      } else if (oldRepeat === 'weekly') {
+        tmpl.weekdays = [1, 2, 3, 4, 5]
+      } else {
+        tmpl.weekdays = [1] // monthly → 默认周一
+      }
+      delete (tmpl as any).repeat
+      migrated++
+    }
+  }
+  if (migrated > 0) {
+    await db.write()
+    console.log('[database]', `已迁移 ${migrated} 个旧模板的 repeat → weekdays`)
+  }
+
   console.log('[database]', `已加载 ${data().tasks.length} 条任务, ${data().templates.length} 个模板`)
 }
 
