@@ -1,137 +1,147 @@
 /**
- * 主进程数据库模块 — 使用 lowdb v5 (JSON file) 持久化任务数据
+ * 主进程数据库模块 — 使用 lowdb v5 (JSON file)
  *
- * lowdb v5 是 ESM-only，在 CJS 主进程中通过动态 import() 加载。
+ * 单一数据集合：tasks — 一切皆 Task。
+ * 重复是属性，排程靠 scheduledDate/scheduledTime。
+ *
+ * lowdb v5 是 ESM-only，通过动态 import() 加载。
  */
 import { app } from 'electron'
 import path from 'node:path'
-import type { Task, RepeatTemplate } from '../src/types/task'
+import type { Task } from '../src/types/task'
 
 // ==================== 数据库类型 ====================
 
 interface DBSchema {
   tasks: Task[]
-  templates: RepeatTemplate[]
+  /** @deprecated 旧字段，启动时自动迁移 */
+  templates?: any[]
+  /** @deprecated 旧字段，启动时自动迁移 */
+  repeatTasks?: any[]
 }
 
 // ==================== 内部状态 ====================
 
 let db: Awaited<ReturnType<typeof createLowDB>> | null = null
 
-/** 获取数据库数据（保证非空） */
 function data(): DBSchema {
   if (!db?.data) throw new Error('数据库未初始化')
   return db.data
 }
 
-// 动态导入 lowdb (ESM-only)
 async function createLowDB(filePath: string) {
   const { Low } = await import('lowdb')
   const { JSONFile } = await import('lowdb/node')
   const adapter = new JSONFile<DBSchema>(filePath)
   const instance = new Low<DBSchema>(adapter)
   await instance.read()
-  // 文件不存在时，初始化默认数据
-  instance.data ||= { tasks: [], templates: [] }
+  instance.data ||= { tasks: [] }
   await instance.write()
   return instance
 }
 
-// ==================== 公共 API ====================
+// ==================== 初始化 + 迁移 ====================
 
-/** 初始化数据库（应用启动时调用一次） */
 export async function initDatabase(): Promise<void> {
   const filePath = path.join(app.getPath('userData'), 'tasks.json')
-  console.log('[database]', '数据文件路径:', filePath)
+  console.log('[database] 数据文件:', filePath)
   db = await createLowDB(filePath)
 
-  // ===== 数据迁移：旧 repeat 字段 → 新 weekdays 数组 =====
-  let migrated = 0
-  for (const tmpl of data().templates) {
-    if ((tmpl as any).repeat && !tmpl.weekdays) {
-      const oldRepeat: string = (tmpl as any).repeat
-      if (oldRepeat === 'daily') {
-        tmpl.weekdays = [0, 1, 2, 3, 4, 5, 6]
-      } else if (oldRepeat === 'weekly') {
-        tmpl.weekdays = [1, 2, 3, 4, 5]
-      } else {
-        tmpl.weekdays = [1] // monthly → 默认周一
+  let migrated = false
+
+  // 迁移 1: 旧 repeatTasks/templates 只保留启用中的，合入 tasks
+  const oldRTs = data().repeatTasks ?? data().templates ?? []
+  if (oldRTs.length > 0) {
+    for (const rt of oldRTs) {
+      if (rt.enabled === false) continue
+      // 检查是否已有此标题的重复任务
+      const exists = data().tasks.some(t => t.repeatEnabled && t.title === rt.title)
+      if (!exists) {
+        const migratedTask: Task = {
+          id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+          title: rt.title,
+          description: rt.description,
+          priority: rt.priority ?? 'medium',
+          tag: rt.tag,
+          scheduledDate: undefined,
+          scheduledTime: rt.dueTime ?? rt.scheduledTime,
+          completed: false,
+          createdAt: rt.createdAt ?? new Date().toISOString(),
+          inboxOrder: Date.now(),
+          reminder: !!rt.reminderTime,
+          repeatEnabled: true,
+          repeatConfig: {
+            weekdays: rt.weekdays ?? [1, 2, 3, 4, 5],
+            completedDates: [],
+          },
+        }
+        data().tasks.push(migratedTask)
       }
-      delete (tmpl as any).repeat
-      migrated++
+    }
+    delete data().repeatTasks
+    delete data().templates
+    migrated = true
+    console.log('[database] 已迁移旧重复任务 → 统一 Task 模型')
+  }
+
+  // 迁移 2: 清理旧字段
+  for (const t of data().tasks) {
+    if (t.inboxOrder === undefined) t.inboxOrder = Date.now()
+    if (t.repeatEnabled === undefined) t.repeatEnabled = false
+    // 清理废弃字段
+    for (const key of ['templateId', 'repeatTaskId', 'sourceRepeatId', 'lastGeneratedDate', 'dueDate', 'dueTime']) {
+      if ((t as any)[key] !== undefined) {
+        if (key === 'dueDate' && !t.scheduledDate) t.scheduledDate = (t as any).dueDate
+        if (key === 'dueTime' && !t.scheduledTime) t.scheduledTime = (t as any).dueTime
+        delete (t as any)[key]
+        migrated = true
+      }
+    }
+    // 确保 repeatConfig 有 completedDates
+    if (t.repeatConfig && !t.repeatConfig.completedDates) {
+      t.repeatConfig.completedDates = []
+      migrated = true
+    }
+    // 迁移 reminderTime → reminder
+    if ((t as any).reminderTime !== undefined) {
+      t.reminder = !!(t as any).reminderTime
+      delete (t as any).reminderTime
+      migrated = true
+    }
+    // 移除旧的 generateTime
+    if (t.repeatConfig && (t.repeatConfig as any).generateTime) {
+      delete (t.repeatConfig as any).generateTime
+      migrated = true
     }
   }
-  if (migrated > 0) {
-    await db.write()
-    console.log('[database]', `已迁移 ${migrated} 个旧模板的 repeat → weekdays`)
-  }
 
-  console.log('[database]', `已加载 ${data().tasks.length} 条任务, ${data().templates.length} 个模板`)
+  if (migrated) await db.write()
+  console.log('[database] 已加载', data().tasks.length, '条任务')
 }
 
-/** 获取所有任务（先重新读取文件以获取最新数据） */
+// ==================== CRUD ====================
+
 export async function loadTasks(): Promise<Task[]> {
   if (!db) return []
   await db.read()
-  db.data ||= { tasks: [], templates: [] }
+  db.data ||= { tasks: [] }
   return data().tasks
 }
 
-/** 添加一条任务 */
 export async function addTask(task: Task): Promise<void> {
   if (!db) throw new Error('数据库未初始化')
   data().tasks.push(task)
   await db.write()
 }
 
-/** 更新一条任务（按 id 匹配） */
 export async function updateTask(task: Task): Promise<void> {
   if (!db) throw new Error('数据库未初始化')
-  const idx = data().tasks.findIndex((t) => t.id === task.id)
-  if (idx !== -1) {
-    data().tasks[idx] = task
-    await db.write()
-  }
+  const idx = data().tasks.findIndex(t => t.id === task.id)
+  if (idx !== -1) { data().tasks[idx] = task; await db.write() }
 }
 
-/** 删除一条任务 */
 export async function deleteTask(id: string): Promise<void> {
   if (!db) throw new Error('数据库未初始化')
-  const d = data()
-  d.tasks = d.tasks.filter((t) => t.id !== id)
-  await db.write()
-}
-
-// ==================== 重复模板 CRUD ====================
-
-export async function loadTemplates(): Promise<RepeatTemplate[]> {
-  if (!db) return []
-  await db.read()
-  db.data ||= { tasks: [], templates: [] }
-  return data().templates
-}
-
-export async function addTemplate(tmpl: RepeatTemplate): Promise<void> {
-  if (!db) throw new Error('数据库未初始化')
-  data().templates.push(tmpl)
-  await db.write()
-}
-
-export async function updateTemplate(tmpl: RepeatTemplate): Promise<void> {
-  if (!db) throw new Error('数据库未初始化')
-  const idx = data().templates.findIndex((t) => t.id === tmpl.id)
-  if (idx !== -1) {
-    data().templates[idx] = tmpl
-    await db.write()
-  }
-}
-
-export async function deleteTemplate(id: string): Promise<void> {
-  if (!db) throw new Error('数据库未初始化')
-  const d = data()
-  // 删除模板
-  d.templates = d.templates.filter((t) => t.id !== id)
-  // 同步删除该模板生成的所有任务
-  d.tasks = d.tasks.filter((t) => t.templateId !== id)
+  data().tasks = data().tasks.filter(t => t.id !== id)
   await db.write()
 }

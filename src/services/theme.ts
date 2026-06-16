@@ -1,80 +1,24 @@
-/**
- * 主题色系统 — 预设 8 种主题色，通过 CSS 变量动态切换
- *
- * 使用方式：
- *   组件中通过内联 style 引用 var(--color-primary-500) 等变量
- *   切换主题色时更新 :root 上的 CSS 变量即可全局生效
- */
+/** 暗黑模式切换 */
 
-// ==================== 类型 ====================
-
-export type ThemeColorName = 'indigo' | 'blue' | 'green' | 'purple' | 'rose' | 'amber' | 'teal' | 'cyan'
-
-export interface ThemeShades {
-  50: string; 100: string; 200: string; 300: string; 400: string
-  500: string; 600: string; 700: string; 800: string; 900: string; 950: string
+export function toggleDarkMode(): boolean {
+  const next = !document.documentElement.classList.contains('dark')
+  document.documentElement.classList.toggle('dark', next)
+  localStorage.setItem('theme', next ? 'dark' : 'light')
+  return next
 }
 
-// ==================== 预设主题 ====================
-
-export const THEME_PRESETS: Record<ThemeColorName, { label: string; shades: ThemeShades }> = {
-  indigo: {
-    label: '靛蓝',
-    shades: { 50:'#eef2ff',100:'#e0e7ff',200:'#c7d2fe',300:'#a5b4fc',400:'#818cf8',500:'#6366f1',600:'#4f46e5',700:'#4338ca',800:'#3730a3',900:'#312e81',950:'#1e1b4b' },
-  },
-  blue: {
-    label: '海蓝',
-    shades: { 50:'#eff6ff',100:'#dbeafe',200:'#bfdbfe',300:'#93c5fd',400:'#60a5fa',500:'#3b82f6',600:'#2563eb',700:'#1d4ed8',800:'#1e40af',900:'#1e3a8a',950:'#172554' },
-  },
-  green: {
-    label: '翠绿',
-    shades: { 50:'#f0fdf4',100:'#dcfce7',200:'#bbf7d0',300:'#86efac',400:'#4ade80',500:'#22c55e',600:'#16a34a',700:'#15803d',800:'#166534',900:'#14532d',950:'#052e16' },
-  },
-  purple: {
-    label: '紫罗兰',
-    shades: { 50:'#faf5ff',100:'#f3e8ff',200:'#e9d5ff',300:'#d8b4fe',400:'#c084fc',500:'#a855f7',600:'#9333ea',700:'#7e22ce',800:'#6b21a8',900:'#581c87',950:'#3b0764' },
-  },
-  rose: {
-    label: '玫瑰',
-    shades: { 50:'#fff1f2',100:'#ffe4e6',200:'#fecdd3',300:'#fda4af',400:'#fb7185',500:'#f43f5e',600:'#e11d48',700:'#be123c',800:'#9f1239',900:'#881337',950:'#4c0519' },
-  },
-  amber: {
-    label: '琥珀',
-    shades: { 50:'#fffbeb',100:'#fef3c7',200:'#fde68a',300:'#fcd34d',400:'#fbbf24',500:'#f59e0b',600:'#d97706',700:'#b45309',800:'#92400e',900:'#78350f',950:'#451a03' },
-  },
-  teal: {
-    label: '青碧',
-    shades: { 50:'#f0fdfa',100:'#ccfbf1',200:'#99f6e4',300:'#5eead4',400:'#2dd4bf',500:'#14b8a6',600:'#0d9488',700:'#0f766e',800:'#115e59',900:'#134e4a',950:'#042f2e' },
-  },
-  cyan: {
-    label: '天蓝',
-    shades: { 50:'#ecfeff',100:'#cffafe',200:'#a5f3fc',300:'#67e8f9',400:'#22d3ee',500:'#06b6d4',600:'#0891b2',700:'#0e7490',800:'#155e75',900:'#164e63',950:'#083344' },
-  },
-}
-
-export const DEFAULT_THEME: ThemeColorName = 'indigo'
-
-// ==================== CSS 变量应用 ====================
-
-/** 将主题色写入 :root CSS 变量 */
-export function applyTheme(name: ThemeColorName): void {
-  const shades = THEME_PRESETS[name].shades
-  const root = document.documentElement
-  for (const [key, value] of Object.entries(shades)) {
-    root.style.setProperty(`--color-primary-${key}`, value)
+export function loadDarkMode(): boolean {
+  const stored = localStorage.getItem('theme')
+  if (stored === 'dark') {
+    document.documentElement.classList.add('dark')
+    return true
   }
-}
-
-/** 从 localStorage 读取主题色 */
-export function loadTheme(): ThemeColorName {
-  try {
-    const stored = localStorage.getItem('themeColor')
-    if (stored && stored in THEME_PRESETS) return stored as ThemeColorName
-  } catch { /* ignore */ }
-  return DEFAULT_THEME
-}
-
-/** 保存主题色到 localStorage */
-export function saveTheme(name: ThemeColorName): void {
-  localStorage.setItem('themeColor', name)
+  if (stored === 'light') {
+    document.documentElement.classList.remove('dark')
+    return false
+  }
+  // 默认跟随系统
+  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+  document.documentElement.classList.toggle('dark', prefersDark)
+  return prefersDark
 }

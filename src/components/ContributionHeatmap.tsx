@@ -1,5 +1,6 @@
-import { useMemo } from 'react'
+import React, { useMemo } from 'react'
 import type { Task } from '../types/task'
+import { localDateStr } from '../types/task'
 
 // ==================== 类型 ====================
 
@@ -22,17 +23,17 @@ interface ContributionHeatmapProps {
 function getColorClass(level: number, isToday: boolean): string {
   if (level === 0) {
     return isToday
-      ? 'bg-gray-200 dark:bg-gray-700 ring-2 ring-indigo-400'
-      : 'bg-gray-100 dark:bg-gray-800'
+      ? 'bg-warm-200 dark:bg-warm-700 ring-2 ring-accent-400'
+      : 'bg-warm-100 dark:bg-warm-800'
   }
   const colors = [
-    '', // level 0 handled above
-    'bg-green-200 dark:bg-green-900',
-    'bg-green-300 dark:bg-green-700',
-    'bg-green-400 dark:bg-green-600',
-    'bg-green-500 dark:bg-green-500',
+    '',
+    'bg-accent-200 dark:bg-accent-900',
+    'bg-accent-300 dark:bg-accent-700',
+    'bg-accent-400 dark:bg-accent-600',
+    'bg-accent-500 dark:bg-accent-500',
   ]
-  return `${colors[level]} ${isToday ? 'ring-2 ring-indigo-400' : ''}`
+  return `${colors[level]} ${isToday ? 'ring-2 ring-accent-400' : ''}`
 }
 
 // ==================== 组件 ====================
@@ -40,7 +41,7 @@ function getColorClass(level: number, isToday: boolean): string {
 export default function ContributionHeatmap({ tasks, months = 3 }: ContributionHeatmapProps) {
   const { grid, monthLabels, weekDayLabels, maxCount, todayISO } = useMemo(() => {
     const today = new Date()
-    const todayISO = today.toISOString().slice(0, 10)
+    const todayISO = localDateStr()
 
     // 日期范围：过去 3 个月
     const startDate = new Date(today)
@@ -63,7 +64,7 @@ export default function ContributionHeatmap({ tasks, months = 3 }: ContributionH
     let max = 0
     const d = new Date(startDate)
     while (d <= endDate) {
-      const iso = d.toISOString().slice(0, 10)
+      const iso = localDateStr(d)
       const count = countMap.get(iso) ?? 0
       if (count > max) max = count
 
@@ -120,80 +121,70 @@ export default function ContributionHeatmap({ tasks, months = 3 }: ContributionH
   }, [tasks, months])
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl p-5 ring-1 ring-gray-200/60 dark:ring-gray-700/60">
+    <div className="gradient-card p-5">
       <div className="flex items-center justify-between mb-4">
-        <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+        <p className="text-sm font-semibold text-warm-700 dark:text-warm-300">
           📅 完成热力图（近{months}个月）
         </p>
-        <span className="text-xs text-gray-400">
+        <span className="text-xs text-warm-400">
           共 {maxCount > 0 ? tasks.filter((t) => t.completed).length : 0} 次完成
         </span>
       </div>
 
       <div className="overflow-x-auto">
-        <div className="inline-flex flex-col gap-0.5 min-w-max">
-          {/* 月份标签行 */}
-          <div className="flex mb-1 ml-8">
-            {monthLabels.map((m, i) => (
-              <span
-                key={i}
-                className="text-[11px] text-gray-400"
-                style={{ marginLeft: i === 0 ? m.colStart * 18 : (m.colStart - monthLabels[i - 1].colStart) * 18 }}
-              >
-                {m.label}
-              </span>
-            ))}
-          </div>
+        <div className="inline-grid min-w-max"
+          style={{
+            gridTemplateColumns: `30px repeat(${grid[0].length}, 14px)`,
+            gap: '2px',
+          }}>
+          {/* 第一行：空 + 月份标签 */}
+          <div />
+          {(() => {
+            const cells: React.ReactNode[] = []
+            for (let i = 0; i < monthLabels.length; i++) {
+              const span = i < monthLabels.length - 1
+                ? monthLabels[i + 1].colStart - monthLabels[i].colStart
+                : grid[0].length - monthLabels[i].colStart
+              cells.push(
+                <div key={`m${i}`} className="text-[11px] text-warm-400 leading-none"
+                  style={{ gridColumn: `span ${span}` }}>
+                  {monthLabels[i].label}
+                </div>
+              )
+            }
+            return cells
+          })()}
 
-          <div className="flex gap-0.5">
-            {/* 星期标签列 */}
-            <div className="flex flex-col gap-0.5 mr-1.5">
-              {weekDayLabels.map((label, i) => (
-                <span
-                  key={i}
-                  className="text-[11px] text-gray-400 h-3.5 w-6 flex items-center justify-end leading-none"
-                  style={{ marginTop: i === 0 ? 0 : 2 }}
-                >
-                  {i % 2 === 0 ? label : ''}
-                </span>
-              ))}
-            </div>
-
-            {/* 热力图网格 */}
-            {grid[0].map((_, colIdx) => (
-              <div key={colIdx} className="flex flex-col gap-0.5">
-                {grid.map((row, rowIdx) => {
-                  const day = row[colIdx]
-                  if (!day) return <div key={rowIdx} className="w-3.5 h-3.5" />
-
-                  const isToday = day.date === todayISO
-                  return (
-                    <div
-                      key={rowIdx}
-                      title={`${day.label}: ${day.count} 个任务完成`}
-                      className={`
-                        w-3.5 h-3.5 rounded-sm
-                        transition-colors duration-200
-                        cursor-pointer hover:ring-2 hover:ring-indigo-300
-                        ${getColorClass(day.level, isToday)}
-                      `}
-                    />
-                  )
-                })}
+          {/* 第 2-8 行：星期标签 + 每行所有列的热力图格子 */}
+          {grid.map((row, rowIdx) => (
+            <React.Fragment key={`r${rowIdx}`}>
+              <div className="text-[11px] text-warm-400 h-[14px] flex items-center justify-end leading-none">
+                {rowIdx % 2 === 0 ? weekDayLabels[rowIdx] : ''}
               </div>
-            ))}
-          </div>
+              {row.map((day, colIdx) =>
+                day ? (
+                  <div
+                    key={`${colIdx}-${rowIdx}`}
+                    title={`${day.label}: ${day.count} 个任务完成`}
+                    className={`w-[14px] h-[14px] rounded-sm transition-colors duration-200 cursor-pointer hover:ring-2 hover:ring-accent-400 ${getColorClass(day.level, day.date === todayISO)}`}
+                  />
+                ) : (
+                  <div key={`${colIdx}-${rowIdx}`} className="w-[14px] h-[14px]" />
+                )
+              )}
+            </React.Fragment>
+          ))}
         </div>
       </div>
 
       {/* 图例 */}
-      <div className="flex items-center gap-1.5 mt-3 text-[11px] text-gray-400">
+      <div className="flex items-center gap-1.5 mt-3 text-[11px] text-warm-400">
         <span>少</span>
-        <div className="w-3.5 h-3.5 rounded-sm bg-gray-100 dark:bg-gray-800" />
-        <div className="w-3.5 h-3.5 rounded-sm bg-green-200 dark:bg-green-900" />
-        <div className="w-3.5 h-3.5 rounded-sm bg-green-300 dark:bg-green-700" />
-        <div className="w-3.5 h-3.5 rounded-sm bg-green-400 dark:bg-green-600" />
-        <div className="w-3.5 h-3.5 rounded-sm bg-green-500 dark:bg-green-500" />
+        <div className="w-3.5 h-3.5 rounded-sm bg-warm-100 dark:bg-warm-800" />
+        <div className="w-3.5 h-3.5 rounded-sm bg-accent-200 dark:bg-accent-900" />
+        <div className="w-3.5 h-3.5 rounded-sm bg-accent-300 dark:bg-accent-700" />
+        <div className="w-3.5 h-3.5 rounded-sm bg-accent-400 dark:bg-accent-600" />
+        <div className="w-3.5 h-3.5 rounded-sm bg-accent-500 dark:bg-accent-500" />
         <span>多</span>
       </div>
     </div>

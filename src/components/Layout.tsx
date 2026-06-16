@@ -1,23 +1,12 @@
-import { Outlet, useLocation } from 'react-router-dom'
+import { Outlet } from 'react-router-dom'
 import Sidebar from './Sidebar'
 
 export default function Layout() {
-  const location = useLocation()
-  const isStatistics = location.pathname === '/statistics'
-
   return (
-    <div className="flex min-h-screen bg-white dark:bg-gray-800 transition-colors duration-300">
-      {/* 左侧边栏 */}
+    <div className="flex min-h-screen bg-warm-50 dark:bg-warm-950 transition-colors duration-500">
       <Sidebar />
-
-      {/* 右侧内容区 */}
-      <main className="flex-1 overflow-y-auto">
-        <div
-          className={`
-            mx-auto px-6 sm:px-8 py-8
-            ${isStatistics ? 'max-w-6xl' : 'max-w-3xl'}
-          `}
-        >
+      <main className="flex-1 overflow-hidden">
+        <div className="h-full px-8 py-6">
           <Outlet />
         </div>
       </main>

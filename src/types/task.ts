@@ -1,10 +1,26 @@
 /**
- * 任务数据模型
+ * 统一任务数据模型
  *
- * 两套管理系统：
- * 1. Task — 今日待办任务实例（由用户创建或 RepeatTemplate 自动生成）
- * 2. RepeatTemplate — 重复任务模板（到达生成时间时自动创建 Task 实例）
+ * 一切皆 Task。重复只是属性，排程靠日期+时间。
+ * - 未安排 scheduledDate 的任务 → 出现在"收件箱"中
+ * - 安排了 scheduledDate 的任务 → 出现在时间线/周视图上
+ * - repeatEnabled 的任务 → 直接按 weekdays 映射到对应日期显示
  */
+
+// ==================== 星期 ====================
+
+export type Weekday = 0 | 1 | 2 | 3 | 4 | 5 | 6
+
+export const WEEKDAY_NAMES: Record<Weekday, string> = {
+  0: '日', 1: '一', 2: '二', 3: '三', 4: '四', 5: '五', 6: '六',
+}
+
+// ==================== 重复配置 ====================
+
+export interface RepeatConfig {
+  weekdays: number[]          // 在哪些星期几出现
+  completedDates: string[]    // 已完成的日期列表 (ISO)，用于追踪每日完成状态
+}
 
 // ==================== Task ====================
 
@@ -13,48 +29,42 @@ export interface Task {
   title: string
   description?: string
   priority: 'low' | 'medium' | 'high'
-  dueTime?: string         // 最晚打卡时间 "22:00"
-  tag?: string             // 如 "工作"、"个人"
-  completed: boolean
-  createdAt: string        // ISO 时间戳
-  completedAt?: string     // ISO 时间戳，完成时记录
-  reminderTime?: string    // 提醒时间 "HH:mm"，为空表示不提醒
-  lastNotifiedDate?: string // ISO 日期，上次提醒日期（避免重复提醒）
-  templateId?: string      // 关联的重复模板 ID（由模板生成的任务）
-}
-
-export type TaskFormData = Omit<Task, 'id' | 'completed' | 'createdAt' | 'completedAt' | 'lastNotifiedDate' | 'templateId'>
-
-// ==================== RepeatTemplate ====================
-
-/** 星期几 (0=周日, 1=周一, ..., 6=周六) */
-export type Weekday = 0 | 1 | 2 | 3 | 4 | 5 | 6
-
-export const WEEKDAY_NAMES: Record<Weekday, string> = {
-  0: '日', 1: '一', 2: '二', 3: '三', 4: '四', 5: '五', 6: '六',
-}
-
-export interface RepeatTemplate {
-  id: string
-  title: string
-  description?: string
-  priority: 'low' | 'medium' | 'high'
-  dueTime?: string          // 生成的 Task 的打卡截止时间
-  generateTime: string      // 每日生成时间 "08:00"
-  reminderTime?: string     // 提醒时间 "HH:mm"，为空表示不提醒
   tag?: string
-  weekdays: number[]         // 在哪些星期几重复 (0=周日, 1=周一...)
-  enabled: boolean           // 是否启用
-  lastGeneratedDate?: string // 上次生成日期（ISO），避免当天重复生成
+
+  // 排程
+  scheduledDate?: string    // ISO 日期 — undefined = 收件箱（重复任务也为 undefined）
+  scheduledTime?: string    // "14:30" — undefined = 全天/未安排
+  duration?: number         // 预估耗时（分钟）
+
+  // 状态
+  completed: boolean
+  completedAt?: string
   createdAt: string
+  inboxOrder: number        // 收件箱排序
+
+  // 提醒
+  reminder: boolean         // 是否在 scheduledTime 时提醒
+  lastNotifiedDate?: string
+
+  // 重复
+  repeatEnabled: boolean
+  repeatConfig?: RepeatConfig
 }
 
-export type RepeatTemplateFormData = Omit<RepeatTemplate, 'id' | 'enabled' | 'lastGeneratedDate' | 'createdAt'>
+/** 新建/编辑任务时的表单数据 */
+export type TaskFormData = Omit<Task, 'id' | 'completed' | 'completedAt' | 'createdAt' | 'lastNotifiedDate' | 'inboxOrder'>
 
 // ==================== 配置 ====================
 
 export const PRIORITY_CONFIG = {
-  high:   { label: '高',   color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' },
-  medium: { label: '中',   color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' },
-  low:    { label: '低',   color: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' },
+  high:   { label: '高', color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400', dot: 'bg-red-500' },
+  medium: { label: '中', color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400', dot: 'bg-amber-500' },
+  low:    { label: '低', color: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400', dot: 'bg-green-500' },
 } as const
+
+export const TIMELINE_HOURS = Array.from({ length: 19 }, (_, i) => i + 6) // 6:00–24:00
+
+/** 获取本地日期字符串 "YYYY-MM-DD"（不受时区影响） */
+export function localDateStr(d: Date = new Date()): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}

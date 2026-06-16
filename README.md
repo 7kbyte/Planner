@@ -1,6 +1,6 @@
 # 📋 Daily Planner
 
-> 一款基于 Electron + React 的桌面端日常计划管理与打卡应用。
+> 一款基于 Electron + React 的桌面端日程安排与打卡应用。
 
 <p align="center">
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-blue" alt="Platform" />
@@ -14,15 +14,31 @@
 
 ## ✨ 功能特性
 
-- **📅 任务管理** — 创建、编辑、删除任务，支持优先级（高/中/低）、标签、截止日期与时间
-- **✅ 打卡完成** — 圆形复选框带弹性动画，完成后自动下沉并添加删除线
-- **🔄 重复任务** — 支持每天/每周/每月重复，完成时自动生成下一周期任务
-- **🔔 桌面通知** — 到达提醒时间自动弹出系统通知，点击可聚焦应用窗口
+- **📅 紧凑日程视图** — 今日页面显示紧凑日程列表，顶部时间进度条，无需滚动
+- **📆 周视图** — 7 列网格布局，所有任务按天排列，重复任务自动展开
+- **🔄 重复任务** — 设置星期几重复，自动映射到对应日期，无需手动生成
+- **✅ 勾选完成** — 今日/周视图中一键勾选完成，重复任务按天追踪完成状态
+- **🔔 桌面通知** — 开启提醒后，在任务开始时间自动弹出系统通知
 - **📊 统计分析** — GitHub 风格贡献热力图，recharts 周完成趋势图，优先级分布
-- **🌗 暗黑模式** — 支持浅色/暗黑模式，可跟随系统偏好或手动切换
-- **🎨 主题换色** — 8 种预设主题色，一键切换全局按钮、链接、高亮颜色
+- **🌗 暗黑模式** — 支持浅色/暗黑模式手动切换
+- **🎨 主题换色** — 8 种预设主题色，一键切换全局风格
 - **💾 本地存储** — 使用 lowdb 将数据持久化到本地 JSON 文件，无需网络
 - **🖥️ 桌面原生** — Electron 打包为 Windows/macOS/Linux 原生应用
+
+---
+
+## 🏗️ 设计理念
+
+**一切皆 Task**。重复只是属性（`repeatEnabled` + `weekdays`），排程靠日期 + 时间。
+
+| 概念 | 说明 |
+|---|---|
+| **一次性任务** | 创建后默认归入今天，可设时间和时长 |
+| **重复任务** | 勾选 🔄 后选择星期几，视图层自动映射到各天 |
+| **完成追踪** | 重复任务通过 `completedDates` 按天追踪，今日勾选仅影响今天 |
+| **提醒通知** | 布尔开关，在 `scheduledTime` 时弹出桌面通知 |
+| **任务管理** | 集中在「所有任务」页面进行新建、编辑、删除 |
+| **日程查看** | 今日/周视图仅做查看和勾选，不做增删改 |
 
 ---
 
@@ -36,7 +52,6 @@
 | CSS 框架 | Tailwind CSS 3 (dark mode: class) |
 | 路由 | react-router-dom v7 (HashRouter) |
 | 图表 | recharts |
-| 图标 | @heroicons/react (outline) |
 | 数据库 | lowdb v5 (JSON file) |
 | 打包 | electron-builder |
 
@@ -47,45 +62,46 @@
 ```
 daily-planner/
 ├── electron/
-│   ├── main.ts              # Electron 主进程（窗口、IPC、通知定时器）
+│   ├── main.ts              # 窗口管理 + 桌面通知定时器
 │   ├── preload.ts           # 预加载脚本（contextBridge API）
-│   └── database.ts          # lowdb 数据库封装（CRUD 操作）
+│   └── database.ts          # lowdb 数据库封装 + 自动数据迁移
 ├── scripts/
-│   └── build-electron.mjs   # esbuild 构建 Electron 脚本
+│   └── build-electron.mjs   # esbuild 构建 Electron 主进程
 ├── src/
 │   ├── main.tsx             # React 渲染入口
-│   ├── App.tsx              # 路由配置 + 全局 Provider
+│   ├── App.tsx              # 路由：/ | /week | /all | /stats | /settings
 │   ├── index.css            # Tailwind + CSS 变量 + 动画关键帧
 │   ├── vite-env.d.ts        # TypeScript 类型声明
 │   ├── types/
-│   │   └── task.ts          # Task 数据模型 + 常量配置
+│   │   └── task.ts          # 统一 Task 数据模型 + localDateStr() 工具
 │   ├── services/
 │   │   └── theme.ts         # 主题色系统（8 组预设）
 │   ├── context/
-│   │   └── TaskContext.tsx   # 全局任务状态管理
+│   │   └── TaskContext.tsx   # 全局状态管理 + 重复任务视图层展开
 │   ├── components/
 │   │   ├── Layout.tsx       # 侧边栏 + 内容区布局
-│   │   ├── Sidebar.tsx      # 导航侧边栏
-│   │   ├── TaskCard.tsx     # 任务卡片（复选框 + 优先级 + 标签）
-│   │   ├── AddTaskModal.tsx # 新建任务模态框
+│   │   ├── Sidebar.tsx      # 导航：今日 / 周视图 / 所有任务 / 统计 / 设置
+│   │   ├── ScheduleList.tsx # 今日紧凑日程列表（无滚动）
+│   │   ├── WeekGridView.tsx # 周视图 7 列网格
+│   │   ├── TaskModal.tsx    # 统一任务编辑弹窗（含重复开关）
 │   │   ├── ContributionHeatmap.tsx  # GitHub 风格热力图
 │   │   ├── ColorPicker.tsx  # 主题色选择器
+│   │   ├── ConfirmDialog.tsx # 确认对话框
 │   │   └── EmptyState.tsx   # 空状态插画
 │   └── pages/
-│       ├── TodayPage.tsx    # 今日计划（默认页）
-│       ├── AllTasksPage.tsx  # 所有任务
-│       └── AllTasksPage.tsx   # 所有任务（支持筛选）
-│       ├── StatisticsPage.tsx# 统计分析（热力图 + 图表）
-│       └── SettingsPage.tsx  # 设置（主题色切换）
-├── public/
-│   └── icon.svg             # 应用图标（占位）
-├── index.html               # Vite HTML 入口
-├── package.json             # 依赖 + 脚本 + electron-builder 配置
-├── vite.config.ts           # Vite 配置
-├── tailwind.config.mjs      # Tailwind 配置（动画 + 暗黑模式）
-├── postcss.config.mjs       # PostCSS 配置
-├── tsconfig.json            # TypeScript 配置
-└── .gitignore
+│       ├── TodayPage.tsx    # 今日：紧凑日程列表 + 勾选
+│       ├── WeekPage.tsx     # 周视图：7 列网格 + 勾选
+│       ├── AllTasksPage.tsx # 所有任务：筛选 + 新建 + 编辑 + 删除
+│       ├── StatisticsPage.tsx# 统计分析：热力图 + 趋势图 + 优先级分布
+│       └── SettingsPage.tsx # 设置：外观 + 主题色 + 通知测试
+├── public/icon.svg
+├── index.html
+├── package.json
+├── vite.config.ts
+├── tailwind.config.mjs
+├── postcss.config.mjs
+├── tsconfig.json
+└── README.md
 ```
 
 ---
@@ -100,100 +116,72 @@ daily-planner/
 ### 安装与运行
 
 ```bash
-# 1. 克隆项目
-git clone <repo-url>
-cd daily-planner
-
-# 2. 安装依赖
+git clone <repo-url> && cd daily-planner
 npm install
-
-# 3. 启动开发环境（Vite + Electron 热重载）
 npm run dev
 ```
 
 启动后：
 - Vite 开发服务器 → `http://localhost:5173`
-- Electron 窗口自动打开，加载 Vite 页面
-- 修改 `src/` 下代码 → 渲染进程 HMR 热更新
-- 修改 `electron/` 下代码 → Electron 窗口自动重载
+- Electron 窗口自动打开
+- 修改 `src/` → HMR 热更新
+- 修改 `electron/` → 窗口自动重载
 
 ---
 
 ## 📦 构建与打包
 
-### 生产构建
-
 ```bash
-# 构建渲染进程 + 主进程
-npm run build
+npm run build          # 生产构建
+npm run build:win      # Windows 安装包
+npm run build:mac      # macOS DMG
+npm run build:linux    # Linux AppImage
+npm run build:all      # 全平台
 ```
 
-产物：
-- `dist/` — Vite 打包的渲染进程
-- `dist-electron/` — esbuild 编译的主进程
-
-### 打包为桌面安装包
-
-```bash
-# Windows（NSIS .exe 安装包）
-npm run build:win
-
-# macOS（DMG）
-npm run build:mac
-
-# Linux（AppImage）
-npm run build:linux
-
-# 全平台
-npm run build:all
-```
-
-打包产物位于 `release/` 目录。
-
-### 应用图标
-
-打包前将 `public/icon.svg` 导出为 **512×512 PNG**，命名为 `icon.png` 放入 `public/` 目录。或使用在线工具生成：https://icon.kitchen/
+打包产物位于 `release/` 目录。打包前将 `public/icon.svg` 导出为 512×512 PNG 放入 `public/icon.png`。
 
 ---
 
 ## 🎯 使用指南
 
-### 添加任务
+### 创建任务
 
-点击右下角 **+** 按钮，填写任务信息：
+在侧边栏进入「**所有任务**」页面，点击 **+ 新建任务**：
 - **任务名称**（必填）
 - **描述**（可选）
 - **优先级**：高 🔥 / 中 ⚡ / 低 🌱
-- **截止日期** & 时间
-- **重复**：不重复 / 每天 / 每周 / 每月
-- **标签**（如 工作、个人、学习）
+- **时间** & **时长**
+- **🔔 提醒**：勾选后在开始时间弹通知
+- **🔄 重复**：勾选后选择星期几，自动映射到对应日期
 
-### 完成任务
+### 查看日程
 
-点击任务左侧的 **圆形复选框** 即可标记完成：
-- 普通任务 → 标记完成，卡片下沉并降低透明度
-- 重复任务 → 同时自动生成下个周期的同款任务
+- **今日**：紧凑日程列表，顶部显示时间进度条，当前时段高亮
+- **周视图**：7 列网格，一周内所有任务一览无余
+
+### 勾选完成
+
+在今日或周视图中，点击任务左侧圆形复选框即可标记完成：
+- 一次性任务 → 直接标记完成
+- 重复任务 → 仅标记当天的完成状态，次日刷新
+
+### 编辑 / 删除
+
+进入「**所有任务**」页面，悬停任务项即可看到 ✏️ 编辑和 🗑 删除按钮。
 
 ### 查看统计
 
-点击侧边栏 **统计分析** 查看：
-- 📅 完成热力图（近 3 个月，类似 GitHub 贡献图）
+「**统计**」页面提供：
+- 📅 完成热力图（近 3 个月，类 GitHub 贡献图）
 - 📊 本周完成趋势柱状图
 - 📈 优先级分布条形图
-
-### 切换主题
-
-点击侧边栏 **设置**，从 8 种预设主题色中选择。
-
-### 暗黑模式
-
-点击侧边栏底部的 **🌙 暗黑模式** 按钮切换。
 
 ---
 
 ## 📄 数据存储
 
-所有任务数据存储在本地文件中：
+数据存储在单个 JSON 文件中，`tasks` 数组包含所有任务：
 
 ```
 Windows: %APPDATA%/daily-planner/tasks.json
@@ -201,7 +189,7 @@ macOS:   ~/Library/Application Support/daily-planner/tasks.json
 Linux:   ~/.config/daily-planner/tasks.json
 ```
 
-数据为 JSON 格式，可手动备份或迁移。
+启动时自动迁移旧格式数据，可手动备份或迁移。
 
 ---
 
@@ -210,9 +198,17 @@ Linux:   ~/.config/daily-planner/tasks.json
 | 命令 | 说明 |
 |---|---|
 | `npm run dev` | 启动开发环境（Vite + Electron 并行） |
-| `npm run build` | 生产构建（类型检查 + Vite 打包 + Electron 编译） |
+| `npm run build` | 生产构建 |
 | `npm run lint` | TypeScript 类型检查 |
 | `npm run build:electron` | 单独构建 Electron 主进程 |
+| `npm run build:win` / `:mac` / `:linux` | 平台打包 |
+| `npm run build:all` | 全平台打包 |
+
+---
+
+## 📝 许可
+
+MIT License
 | `npm run build:electron:watch` | 监听模式构建 Electron 主进程 |
 | `npm run build:win` | 打包 Windows 安装包 |
 | `npm run build:mac` | 打包 macOS DMG |
