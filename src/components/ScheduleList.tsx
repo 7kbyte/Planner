@@ -27,9 +27,9 @@ export default function ScheduleList({ tasks, onToggle }: Props) {
   }
 
   return (
-    <div className="gradient-card overflow-hidden flex flex-col h-full">
+    <div className="gradient-card flex flex-col h-full">
       {/* === 头部：完成率环 + 玻璃时间条 === */}
-      <div className="p-4 pb-3">
+      <div className="p-4 pb-8">
         <div className="flex items-center gap-4">
           {/* 完成率环形图 */}
           <div className="relative w-16 h-16 shrink-0">
@@ -64,7 +64,7 @@ export default function ScheduleList({ tasks, onToggle }: Props) {
               </span>
             </div>
             {/* 玻璃态时间条 */}
-            <div className="mt-2 h-2 glass rounded-full relative overflow-hidden">
+            <div className="mt-2.5 h-3.5 glass rounded-full relative mb-5">
               <div
                 className="absolute inset-y-0 left-0 rounded-full transition-all duration-700 ease-out"
                 style={{
@@ -76,13 +76,28 @@ export default function ScheduleList({ tasks, onToggle }: Props) {
                 const [h, m] = t.scheduledTime!.split(':').map(Number)
                 const pct = ((h * 60 + m) / (24 * 60)) * 100
                 return (
-                  <div key={t.id}
-                    className={`absolute top-1/2 -translate-y-1/2 w-2 h-2 rounded-full border border-white dark:border-warm-800 ${
-                      t.completed ? 'bg-warm-300 dark:bg-warm-600' : 'bg-accent-500'
-                    }`}
-                    style={{ left: `${pct}%` }}
-                    title={t.title}
-                  />
+                  <div key={t.id} className="group absolute" style={{ left: `${pct}%`, top: '50%', transform: 'translate(-50%, -50%)' }}>
+                    {/* 圆点 */}
+                    <div className={`w-3 h-3 rounded-full ring-2 ring-white dark:ring-warm-800 cursor-pointer transition-transform group-hover:scale-150 ${
+                      t.completed
+                        ? 'bg-warm-300 dark:bg-warm-600'
+                        : t.priority === 'high' ? 'bg-rose-400'
+                        : t.priority === 'medium' ? 'bg-amber-400'
+                        : 'bg-accent-500'
+                    }`} />
+                    {/* 悬浮气泡 */}
+                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1.5 rounded-lg
+                                    bg-warm-800 dark:bg-warm-100 text-white dark:text-warm-800 text-xs font-medium
+                                    whitespace-nowrap opacity-0 group-hover:opacity-100 transition-all duration-200
+                                    pointer-events-none shadow-lg">
+                      <span className="text-[11px] opacity-70 mr-1.5">{t.scheduledTime}</span>
+                      {t.title}
+                      {/* 气泡三角 */}
+                      <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0
+                                      border-l-4 border-r-4 border-t-4
+                                      border-l-transparent border-r-transparent border-t-warm-800 dark:border-t-warm-100" />
+                    </div>
+                  </div>
                 )
               })}
             </div>
@@ -133,7 +148,7 @@ export default function ScheduleList({ tasks, onToggle }: Props) {
               </button>
 
               {/* 时间戳 */}
-              <div className="w-14 shrink-0">
+              <div className="w-14 shrink-0 text-right">
                 {task.scheduledTime ? (
                   <span className={`text-sm font-mono font-semibold tracking-tight ${
                     isCurrent ? 'text-accent-600 dark:text-accent-400' : 'text-warm-400 dark:text-warm-500'
@@ -148,42 +163,36 @@ export default function ScheduleList({ tasks, onToggle }: Props) {
                 )}
               </div>
 
-              {/* 内容 */}
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className={`text-[15px] font-medium truncate ${
-                    task.completed
-                      ? 'line-through text-warm-400 dark:text-warm-500'
-                      : 'text-warm-800 dark:text-warm-100'
-                  }`}>
-                    {task.title}
+              {/* 内容：标题 + 描述同行 */}
+              <div className="flex-1 min-w-0 flex items-baseline gap-1.5">
+                <span className={`text-[15px] font-semibold truncate ${
+                  task.completed
+                    ? 'line-through text-warm-400 dark:text-warm-500'
+                    : 'text-warm-800 dark:text-warm-100'
+                }`}>
+                  {task.title}
+                </span>
+                {task.description && (
+                  <span className="text-[15px] text-warm-400 dark:text-warm-500 truncate hidden sm:inline">
+                    — {task.description}
                   </span>
-                  <span className={`shrink-0 w-2 h-2 rounded-full ${
-                    task.priority === 'high' ? 'bg-rose-400 shadow-sm shadow-rose-400/40'
-                    : task.priority === 'medium' ? 'bg-amber-400 shadow-sm shadow-amber-400/40'
-                    : 'bg-emerald-400 shadow-sm shadow-emerald-400/40'
-                  }`} />
-                  {task.repeatEnabled && (
-                    <span className="text-xs opacity-50 shrink-0" title="重复任务">🔄</span>
-                  )}
-                  {task.reminder && (
-                    <span className="text-xs opacity-50 shrink-0" title="已开启提醒">🔔</span>
-                  )}
-                </div>
-                {(task.tag || task.description) && (
-                  <div className="flex items-center gap-2 mt-1">
-                    {task.tag && (
-                      <span className="text-[11px] px-2 py-0.5 rounded-full bg-accent-50 dark:bg-accent-900/30 text-accent-600 dark:text-accent-400">
-                        {task.tag}
-                      </span>
-                    )}
-                    {task.description && (
-                      <span className="text-xs text-warm-400 truncate max-w-[200px]">
-                        {task.description}
-                      </span>
-                    )}
-                  </div>
                 )}
+              </div>
+
+              {/* 右侧元数据 */}
+              <div className="flex items-center gap-2 shrink-0 ml-2">
+                {task.tag && (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-accent-50 dark:bg-accent-900/30 text-accent-600 dark:text-accent-400">
+                    {task.tag}
+                  </span>
+                )}
+                <span className={`w-2 h-2 rounded-full ${
+                  task.priority === 'high' ? 'bg-rose-400 shadow-sm shadow-rose-400/40'
+                  : task.priority === 'medium' ? 'bg-amber-400 shadow-sm shadow-amber-400/40'
+                  : 'bg-emerald-400 shadow-sm shadow-emerald-400/40'
+                }`} />
+                {task.repeatEnabled && <span className="text-xs opacity-50" title="重复任务">🔄</span>}
+                {task.reminder && <span className="text-xs opacity-50" title="已开启提醒">🔔</span>}
               </div>
 
               {/* hover 指示 */}

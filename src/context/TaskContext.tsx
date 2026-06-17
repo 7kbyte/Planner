@@ -21,6 +21,10 @@ interface TaskContextValue {
   refreshTasks: () => Promise<void>
   /** 今日时间线任务（含重复任务展开） */
   todayScheduled: Task[]
+  /** 未安排日期时间的任务 */
+  unscheduledTasks: Task[]
+  /** 快速记录一条无日期任务 */
+  quickAddTask: (title: string, description?: string) => Promise<Task>
   /** 对指定日期展开重复任务 */
   expandForDate: (date: string) => Task[]
 }
@@ -86,6 +90,27 @@ export function TaskProvider({ children }: { children: ReactNode }) {
     setTasks(prev => [newTask, ...prev])
     try { if (window.electronAPI) await window.electronAPI.addTask(newTask) }
     catch (err) { console.error('[TaskContext] 添加失败:', err); setTasks(prev => prev.filter(t => t.id !== newTask.id)) }
+    return newTask
+  }, [])
+
+  /** 快速记录：标题 + 可选描述 */
+  const quickAddTask = useCallback(async (title: string, description?: string): Promise<Task> => {
+    const newTask: Task = {
+      id: generateId(),
+      title: title.trim(),
+      description: description?.trim() || undefined,
+      priority: 'medium',
+      completed: false,
+      createdAt: new Date().toISOString(),
+      inboxOrder: Date.now(),
+      repeatEnabled: false,
+      reminder: false,
+      scheduledDate: undefined,
+      scheduledTime: undefined,
+    }
+    setTasks(prev => [newTask, ...prev])
+    try { if (window.electronAPI) await window.electronAPI.addTask(newTask) }
+    catch (err) { console.error('[TaskContext] 快速添加失败:', err); setTasks(prev => prev.filter(t => t.id !== newTask.id)) }
     return newTask
   }, [])
 
@@ -190,10 +215,16 @@ export function TaskProvider({ children }: { children: ReactNode }) {
       .sort((a, b) => (a.scheduledTime || '99:99').localeCompare(b.scheduledTime || '99:99'))
   }, [tasks, todayStr, expandForDate])
 
+  const unscheduledTasks = useMemo(() =>
+    tasks
+      .filter(t => !t.completed && !t.repeatEnabled && !t.scheduledDate && !t.scheduledTime)
+      .sort((a, b) => b.inboxOrder - a.inboxOrder),
+  [tasks])
+
   return (
     <TaskContext.Provider value={{
       tasks, loading, addTask, updateTask, toggleTask, deleteTask,
-      scheduleTask, unscheduleTask, refreshTasks, todayScheduled,
+      scheduleTask, unscheduleTask, refreshTasks, todayScheduled, unscheduledTasks, quickAddTask,
       expandForDate,
     }}>
       {children}
