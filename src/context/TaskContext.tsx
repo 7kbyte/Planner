@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback, useMemo, type ReactNode } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef, type ReactNode } from 'react'
 import type { Task, TaskFormData } from '../types/task'
 import { localDateStr } from '../types/task'
 
@@ -205,7 +205,23 @@ export function TaskProvider({ children }: { children: ReactNode }) {
 
   // ===== 计算视图 =====
 
-  const todayStr = useMemo(() => localDateStr(), [])
+  const [todayStr, setTodayStr] = useState(() => localDateStr())
+  // 使用 ref 追踪上一次的日期，避免每天多次触发 reload
+  const lastDateRef = useRef(todayStr)
+
+  // 每分钟检测一次跨日，自动更新 todayStr
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const now = localDateStr()
+      if (now !== lastDateRef.current) {
+        lastDateRef.current = now
+        setTodayStr(now)
+        // 跨日时重新加载数据库（确保通知状态等最新）
+        loadFromDB()
+      }
+    }, 60_000)
+    return () => clearInterval(timer)
+  }, [loadFromDB])
 
   const todayScheduled = useMemo(() => {
     const regular = tasks
